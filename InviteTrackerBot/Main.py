@@ -30,10 +30,10 @@ async def on_ready():
 @app_commands.describe(goal="Number of invite uses to win the race.")
 async def race_start(interaction: discord.Interaction, goal: int):
     """Start the invite tracking race with a specific goal."""
-    global race_started, invite_goal, race_start_time
+    global race_started, invite_goal, race_start_time, invite_uses
 
+    print(f'Starting Race ({invite_uses})')
     print(f"Received race_start command from {interaction.user} in {interaction.guild}")
-    print(f'Initial Invite List {invite_uses}')
 
     if not interaction.user.guild_permissions.administrator:
         print("User lacks Administrator permissions.")
@@ -67,9 +67,8 @@ async def race_start(interaction: discord.Interaction, goal: int):
     try:
         print("Fetching invites for the guild.")
         invites = await guild.invites()
-        for invite in invites:
-            invite_uses[invite.code] = invite.uses
-
+        # Clear existing invites and only store new invites after race start
+        invite_uses = {}
         race_started = True
         invite_goal = goal
         race_start_time = datetime.datetime.utcnow()
@@ -89,12 +88,13 @@ async def race_start(interaction: discord.Interaction, goal: int):
 @bot.event
 async def on_invite_create(invite):
     """Track new invites."""
-    global race_started, race_start_time
+    global race_started, race_start_time, invite_uses
     if race_started and invite.created_at:
         # Convert race_start_time to an aware datetime with UTC timezone
         aware_race_start_time = race_start_time.replace(tzinfo=datetime.timezone.utc)
         if invite.created_at > aware_race_start_time:
             invite_uses[invite.code] = invite.uses
+            print(f'Invite added ({invite_uses})')
             print(f'New Invite Created After Race Start: {invite.code}')
 
 @bot.event
@@ -107,7 +107,7 @@ async def on_invite_delete(invite):
 async def on_member_join(member):
     """Detect which invite was used when a new member joins."""
     global race_started, invite_goal
-    print(f'Invite used {invite_uses}')
+    print(f'Invite used ({invite_uses})')
 
     if not race_started:
         return
@@ -128,6 +128,7 @@ async def on_member_join(member):
                 # Check if any invite reached the goal
                 if invite.uses >= invite_goal:
                     race_started = False
+                    print(f'Final {invite_uses}')
                     print(f'RACE COMPLETE: `{invite.code}` created by {invite.inviter.mention} has reached {invite_goal} uses and won the race!')
                     await guild.system_channel.send(
                         f"@everyone The invite code **`{invite.code}`** created by {invite.inviter.mention} has reached **{invite_goal}** uses first and won the race!"

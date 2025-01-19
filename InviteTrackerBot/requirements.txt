@@ -1,2 +1,4 @@
 discord.py
 datetime
+audioop-lts
+pytz

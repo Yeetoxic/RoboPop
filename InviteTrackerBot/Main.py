@@ -2,6 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import datetime
+import pytz
 
 # Intents and bot setup
 intents = discord.Intents.default()
@@ -33,7 +34,7 @@ async def race_start(interaction: discord.Interaction, goal: int):
     global race_started, invite_goal, race_start_time, invite_uses
 
     print(f'Starting Race ({invite_uses})')
-    print(f"Received race_start command from {interaction.user} in {interaction.guild}")
+    print(f"Received race_start command from {interaction.user} in '{interaction.guild}'")
 
     if not interaction.user.guild_permissions.administrator:
         print("User lacks Administrator permissions.")
@@ -95,7 +96,7 @@ async def on_invite_create(invite):
         if invite.created_at > aware_race_start_time:
             invite_uses[invite.code] = invite.uses
             print(f'Invite added ({invite_uses})')
-            print(f'New Invite Created After Race Start: {invite.code}')
+            print(f'New Invite Created After Race Start: {invite.code}, by {invite.inviter.mention} at {datetime.datetime.utcnow():.2f}.')
 
 @bot.event
 async def on_invite_delete(invite):
@@ -107,7 +108,6 @@ async def on_invite_delete(invite):
 async def on_member_join(member):
     """Detect which invite was used when a new member joins."""
     global race_started, invite_goal
-    print(f'Invite used ({invite_uses})')
 
     if not race_started:
         return
@@ -124,6 +124,8 @@ async def on_member_join(member):
             # Check if invite was created after the race started and was used
             if invite.code in invite_uses and invite_uses.get(invite.code, 0) < invite.uses:
                 invite_uses[invite.code] = invite.uses
+                print(f'Invite used at {datetime.datetime.utcnow():.2f} ({invite_uses})')
+                print(f'Invite Used After Race Start: {invite.code}')
 
                 # Check if any invite reached the goal
                 if invite.uses >= invite_goal:
@@ -134,10 +136,69 @@ async def on_member_join(member):
                         f"@everyone The invite code **`{invite.code}`** created by {invite.inviter.mention} has reached **{invite_goal}** uses first and won the race!"
                     )
                 break
+            else:
+                print(f'Invite that was not included in the competition was used.')
     except discord.Forbidden:
         print("Missing permissions to access invites in the guild.")
     except Exception as e:
         print(f"An error occurred while processing member join: {e}")
+
+
+@tree.command(name="leader_board", description="Gives the leaderboard of the current race in-progress")
+async def leader_board(interaction: discord.Interaction):
+    """Generate a detailed leaderboard for the invite race."""
+    global invite_uses
+
+    try:
+        if not race_started:
+            await interaction.response.send_message("The race is not currently running.", ephemeral=True)
+            return
+
+        # Get the current time
+        TimeNow = datetime.datetime.now(pytz.timezone('America/Los_Angeles')).strftime("%m/%d/%Y %I:%M:%S %p %Z")
+        
+        # Create an embed for the leaderboard
+        embed = discord.Embed(
+            title="**Invite Race Statistics**",
+            description=f"Generated: **`{TimeNow}`**",
+            color=0x2de639
+        )
+
+        guild = interaction.guild
+        invites = await guild.invites()
+
+        # Dictionary to group invites by inviter
+        invites_by_user = {}
+
+        # Group invites by their inviter
+        for invite in invites:
+            if invite.inviter not in invites_by_user:
+                invites_by_user[invite.inviter] = []
+            invites_by_user[invite.inviter].append(invite)
+
+        # Format the embed fields
+        for inviter, inviter_invites in invites_by_user.items():
+            value = ""
+            for invite in inviter_invites:
+                value += f"> - Invite code (**`{invite.code}`**) with (**`{invite.uses}`**) uses.\n"
+
+            embed.add_field(name=f"Invite(s) by **`{inviter}`**", value=value, inline=True)
+
+        # Check if no invites were found
+        if not invites_by_user:
+            embed.add_field(name="No data", value="No invites have been created yet.", inline=True)
+
+        embed.set_footer(text="RoboPop Interactive Display Interface (c) Yeetoxic 2025")
+        
+        # Send the embed to the interaction channel
+        await interaction.response.send_message(embed=embed)
+
+    except discord.Forbidden:
+        print("Permission error: Missing permissions to send messages or retrieve invites.")
+    except Exception as e:
+        print(f"Unexpected error occurred: {e}")
+
+
 
 @tree.command(name="stop_race", description="Stop the invite tracking race.")
 async def stop_race(interaction: discord.Interaction):

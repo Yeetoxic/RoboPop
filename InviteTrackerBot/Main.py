@@ -147,7 +147,7 @@ async def on_member_join(member):
 @tree.command(name="leader_board", description="Gives the leaderboard of the current race in-progress")
 async def leader_board(interaction: discord.Interaction):
     """Generate a detailed leaderboard for the invite race."""
-    global invite_uses
+    global invite_uses, race_started, race_start_time
 
     try:
         if not race_started:
@@ -157,6 +157,9 @@ async def leader_board(interaction: discord.Interaction):
         # Get the current time
         TimeNow = datetime.datetime.now(pytz.timezone('America/Los_Angeles')).strftime("%m/%d/%Y %I:%M:%S %p %Z")
         
+        # Make race_start_time offset-aware
+        aware_race_start_time = race_start_time.replace(tzinfo=datetime.timezone.utc)
+
         # Create an embed for the leaderboard
         embed = discord.Embed(
             title="**Invite Race Statistics**",
@@ -170,11 +173,12 @@ async def leader_board(interaction: discord.Interaction):
         # Dictionary to group invites by inviter
         invites_by_user = {}
 
-        # Group invites by their inviter
+        # Filter invites created after the race start time
         for invite in invites:
-            if invite.inviter not in invites_by_user:
-                invites_by_user[invite.inviter] = []
-            invites_by_user[invite.inviter].append(invite)
+            if invite.created_at and invite.created_at > aware_race_start_time:
+                if invite.inviter not in invites_by_user:
+                    invites_by_user[invite.inviter] = []
+                invites_by_user[invite.inviter].append(invite)
 
         # Format the embed fields
         for inviter, inviter_invites in invites_by_user.items():
@@ -186,7 +190,7 @@ async def leader_board(interaction: discord.Interaction):
 
         # Check if no invites were found
         if not invites_by_user:
-            embed.add_field(name="No data", value="No invites have been created yet.", inline=True)
+            embed.add_field(name="No data", value="No valid invites created since the race started.", inline=True)
 
         embed.set_footer(text="RoboPop Interactive Display Interface (c) Yeetoxic 2025")
         

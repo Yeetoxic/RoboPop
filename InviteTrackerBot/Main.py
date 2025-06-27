@@ -222,4 +222,4 @@ async def stop_race(interaction: discord.Interaction):
     await interaction.response.send_message("The invite race has been stopped.")
 
 # Run the bot with token
-bot.run("MTMyNzgzNTcxOTAxMTQwMTc1OQ.GtTiKl.jiHIFFl6db1ZWe5fDV8-9pPN-HoYV_RiituHjo")
+bot.run("MTMyNzgzNTcxOTAxMTQwMTc1OQ.GtTiKl.jiHIFFl6db1ZWe5fDV8-9pPN-HoYV_RiituHjo") # <-- This bot token is invalid, I took it down a while ago!
